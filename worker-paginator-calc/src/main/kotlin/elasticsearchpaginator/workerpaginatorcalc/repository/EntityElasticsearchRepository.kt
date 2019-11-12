@@ -1,15 +1,15 @@
 package elasticsearchpaginator.workerpaginatorcalc.repository
 
 import elasticsearchpaginator.core.util.ElasticsearchUtils.async
-import elasticsearchpaginator.core.util.ElasticsearchUtils.parseQuery
-import elasticsearchpaginator.core.util.ElasticsearchUtils.parseSort
 import elasticsearchpaginator.workerpaginatorcalc.configuration.ElasticsearchProperties
 import org.elasticsearch.action.search.*
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestHighLevelClient
 import org.elasticsearch.common.unit.TimeValue
+import org.elasticsearch.index.query.QueryBuilder
 import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.elasticsearch.search.sort.FieldSortBuilder
+import org.elasticsearch.search.sort.SortBuilder
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Mono
 
@@ -19,11 +19,9 @@ class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelCl
 
     private val scrollKeepAlive = TimeValue.timeValueMillis(this.elasticsearchProperties.scrollKeepAliveDuration.toMillis())
 
-    fun searchScroll(index: String, query: String, sort: String, size: Int): Mono<SearchResponse> {
-        val parsedQuery = parseQuery(query)
-        val parsedSorts = parseSort(sort)
+    fun searchScroll(index: String, query: QueryBuilder, sort: List<SortBuilder<*>>, size: Int): Mono<SearchResponse> {
 
-        val includes = parsedSorts
+        val includes = sort
                 .filterIsInstance<FieldSortBuilder>()
                 .map { fieldSortBuilder ->
                     fieldSortBuilder.fieldName
@@ -33,9 +31,9 @@ class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelCl
         return Mono.just(
                 SearchSourceBuilder()
                         .fetchSource(includes, null)
-                        .query(parsedQuery)
+                        .query(query)
                         .let { searchSourceBuilder ->
-                            parsedSorts.fold(searchSourceBuilder) { acc, s -> acc.sort(s) }
+                            sort.fold(searchSourceBuilder) { acc, s -> acc.sort(s) }
                         }
                         .size(size)
         )

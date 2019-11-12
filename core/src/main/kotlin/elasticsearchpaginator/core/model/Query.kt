@@ -1,12 +1,13 @@
 package elasticsearchpaginator.core.model
 
+import org.elasticsearch.index.query.QueryBuilder
 import java.math.BigInteger
 import java.security.MessageDigest
 
 data class Query(
         val index: String,
-        val query: String,
-        val sort: String,
+        val query: QueryBuilder,
+        val sort: SortBuilderList,
         val firstPageSize: Int?,
         val size: Int
 ) {

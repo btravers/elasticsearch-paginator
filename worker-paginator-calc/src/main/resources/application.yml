@@ -9,15 +9,17 @@ spring:
   application:
     name: worker-paginator-calc
   rabbitmq:
-    username: user
-    password: password
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
   elasticsearch:
     rest:
       uris: http://locahost:9200
 
 app:
   elasticsearch:
-    scroll-keep-alive-duration: 1m
+    scroll-keep-alive-duration: 60s
     pages-index: pages
     pages-index-number-replicas: 2
     pages-index-number-shards: 5

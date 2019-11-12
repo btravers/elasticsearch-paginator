@@ -3,7 +3,6 @@ package elasticsearchpaginator.core.configuration
 import com.rabbitmq.client.Connection
 import com.rabbitmq.client.ConnectionFactory
 import org.springframework.beans.factory.DisposableBean
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.autoconfigure.amqp.RabbitProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -11,14 +10,7 @@ import reactor.core.publisher.Mono
 import reactor.rabbitmq.*
 
 @Configuration
-@EnableAutoConfiguration
-class RabbitmqAutoConfiguration(private val rabbitProperties: RabbitProperties) : DisposableBean {
-
-    override fun destroy() {
-        this.connectionMono()
-                .doOnNext(Connection::close)
-                .block()
-    }
+class ReactorRabbitmqAutoConfiguration(private val rabbitProperties: RabbitProperties) {
 
     @Bean
     fun connectionMono(): Mono<Connection> {

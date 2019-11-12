@@ -1,15 +1,13 @@
 {
-  "_doc": {
-    "properties": {
-      "queryId": {
-        "type": "keyword"
-      },
-      "page": {
-        "type": "integer"
-      },
-      "searchAfterQueryParameters": {
-        "enabled": false
-      }
+  "properties": {
+    "queryId": {
+      "type": "keyword"
+    },
+    "page": {
+      "type": "integer"
+    },
+    "searchAfterQueryParameters": {
+      "enabled": false
     }
   }
 }
