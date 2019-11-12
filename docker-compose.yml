@@ -1,0 +1,15 @@
+version: '2.1'
+
+services:
+
+  worker-paginator:
+    image: elasticsearch-paginator/worker-paginator:${TAG:-latest}
+    build:
+      context: ./worker-paginator
+      dockerfile: Dockerfile
+
+  worker-paginator-calc:
+    image: elasticsearch-paginator/worker-paginator-calc:${TAG:-latest}
+    build:
+      context: ./worker-paginator-calc
+      dockerfile: Dockerfile

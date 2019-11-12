@@ -1,0 +1,29 @@
+management:
+  server:
+    port: 8081
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: worker-paginator-calc
+  rabbitmq:
+    username: user
+    password: password
+  elasticsearch:
+    rest:
+      uris: http://locahost:9200
+
+app:
+  elasticsearch:
+    scroll-keep-alive-duration: 1m
+    pages-index: pages
+    pages-index-number-replicas: 2
+    pages-index-number-shards: 5
+    pages-bulk-size: 1000
+  rabbitmq:
+    exchange-name: paginator
+    compute-pages-key: compute-pages
+    delete-pages-key: delete-pages
+    delete-queries-key: delete-queries

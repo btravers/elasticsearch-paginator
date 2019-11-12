@@ -1,0 +1,12 @@
+{
+  "_doc": {
+    "properties": {
+      "query": {
+        "enabled": false
+      },
+      "lastUse": {
+        "type": "date"
+      }
+    }
+  }
+}
