@@ -1,5 +1,7 @@
 package elasticsearchpaginator.workerpaginatorcalc.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import elasticsearchpaginator.core.model.Query
 import elasticsearchpaginator.workerpaginatorcalc.model.Page
 import elasticsearchpaginator.workerpaginatorcalc.repository.EntityElasticsearchRepository
@@ -11,6 +13,7 @@ import reactor.core.publisher.Mono
 
 @Service
 class ComputePagesService(private val pageRepository: PageRepository,
+                          private val mapper: ObjectMapper,
                           private val entityElasticsearchRepository: EntityElasticsearchRepository) {
 
     fun computePages(query: Query): Mono<Void> {
@@ -27,8 +30,8 @@ class ComputePagesService(private val pageRepository: PageRepository,
                 .then()
     }
 
-    private fun getLastEntityForEachPage(query: Query): Flux<String> {
-        return this.findAllEntities(query)
+    private fun getLastEntityForEachPage(query: Query): Flux<Any> {
+        return this.findAllEntitiesWithTotalHits(query)
                 .index()
                 .filter { indexAndEntity ->
                     this.matchesALastPosition(
@@ -41,7 +44,7 @@ class ComputePagesService(private val pageRepository: PageRepository,
                 .map { indexAndEnity -> indexAndEnity.t2.first }
     }
 
-    private fun findAllEntities(query: Query): Flux<Pair<String, Long>> {
+    private fun findAllEntitiesWithTotalHits(query: Query): Flux<Pair<Any, Long>> {
         return this.entityElasticsearchRepository.searchScroll(query.index, query.query, query.sort, query.size)
                 .expand { searchResponse ->
                     if (searchResponse.hits.hits.isEmpty()) {
@@ -53,7 +56,7 @@ class ComputePagesService(private val pageRepository: PageRepository,
                 }
                 .flatMapIterable { searchResponse ->
                     searchResponse.hits.map { searchHit ->
-                        Pair(searchHit.sourceRef.utf8ToString(), searchResponse.hits.totalHits!!.value)
+                        Pair(this.mapper.readValue<Any>(searchHit.sourceRef.streamInput()), searchResponse.hits.totalHits!!.value)
                     }
                 }
     }

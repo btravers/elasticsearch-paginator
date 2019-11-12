@@ -144,7 +144,7 @@ class QueryEntryRepository(private val restHighLevelClient: RestHighLevelClient,
                     searchResponse.hits
                 }
                 .map { searchHit ->
-                    this.mapper.readValue<QueryEntry>(searchHit.sourceRef.toBytesRef().bytes)
+                    this.mapper.readValue<QueryEntry>(searchHit.sourceRef.streamInput())
                 }
     }
 
@@ -169,7 +169,7 @@ class QueryEntryRepository(private val restHighLevelClient: RestHighLevelClient,
                     searchResponse.hits
                 }
                 .map { searchHit ->
-                    this.mapper.readValue<QueryEntry>(searchHit.sourceRef.toBytesRef().bytes)
+                    this.mapper.readValue<QueryEntry>(searchHit.sourceRef.streamInput())
                 }
     }
 

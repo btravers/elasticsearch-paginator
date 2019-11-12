@@ -26,6 +26,9 @@ class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelCl
                 .map { fieldSortBuilder ->
                     fieldSortBuilder.fieldName
                 }
+                .map { fieldName ->
+                    fieldName.removeSuffix(".keyword")
+                }
                 .toTypedArray()
 
         return Mono.just(
