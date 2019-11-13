@@ -1,30 +1,19 @@
 package elasticsearchpaginator.workerpaginatorcalc
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import elasticsearchpaginator.core.model.Query
 import elasticsearchpaginator.core.model.SortBuilderList
 import elasticsearchpaginator.core.util.ElasticsearchUtils
-import elasticsearchpaginator.workerpaginatorcalc.configuration.ElasticsearchProperties
 import elasticsearchpaginator.workerpaginatorcalc.model.Page
 import elasticsearchpaginator.workerpaginatorcalc.service.ComputePagesService
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
-import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
-import org.elasticsearch.action.admin.indices.refresh.RefreshResponse
 import org.elasticsearch.action.bulk.BulkRequest
 import org.elasticsearch.action.bulk.BulkResponse
 import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.search.SearchRequest
-import org.elasticsearch.action.search.SearchResponse
 import org.elasticsearch.action.support.WriteRequest
 import org.elasticsearch.action.support.master.AcknowledgedResponse
 import org.elasticsearch.client.RequestOptions
-import org.elasticsearch.client.RestHighLevelClient
 import org.elasticsearch.common.xcontent.XContentType
 import org.elasticsearch.index.query.QueryBuilders
-import org.elasticsearch.index.reindex.BulkByScrollResponse
-import org.elasticsearch.index.reindex.DeleteByQueryRequest
-import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.elasticsearch.search.sort.SortBuilders
 import org.elasticsearch.search.sort.SortOrder
 import org.jeasy.random.EasyRandom
@@ -40,23 +29,14 @@ import reactor.test.StepVerifier
 import java.time.Instant
 import java.util.stream.Collectors
 
-class WorkerPaginatorCalcIntegrationTest : AbstractIntegrationTest() {
+class ComputePagesIntegrationTest : AbstractIntegrationTest() {
 
     private val indexName = "articles"
 
     val articles = EasyRandom().objects(Article::class.java, 22).collect(Collectors.toList())
 
     @Autowired
-    private lateinit var restHighLevelClient: RestHighLevelClient
-
-    @Autowired
-    private lateinit var mapper: ObjectMapper
-
-    @Autowired
     private lateinit var computePagesService: ComputePagesService
-
-    @Autowired
-    private lateinit var elasticsearchProperties: ElasticsearchProperties
 
     @BeforeAll
     internal fun setUp() {
@@ -274,66 +254,6 @@ class WorkerPaginatorCalcIntegrationTest : AbstractIntegrationTest() {
                 .flatMap { bulkRequest ->
                     ElasticsearchUtils.async<BulkResponse> { actionListener ->
                         this.restHighLevelClient.bulkAsync(bulkRequest, RequestOptions.DEFAULT, actionListener)
-                    }
-                }
-                .then()
-    }
-
-    private fun refreshPages(): Mono<Void> {
-        return Mono.just(
-                RefreshRequest()
-                        .indices(this.elasticsearchProperties.pagesIndex)
-        )
-                .flatMap { refreshRequest ->
-                    ElasticsearchUtils.async<RefreshResponse> { actionListener ->
-                        this.restHighLevelClient.indices().refreshAsync(refreshRequest, RequestOptions.DEFAULT, actionListener)
-                    }
-                }
-                .then()
-    }
-
-    private fun findAllPages(): Flux<Page> {
-        return Mono.just(
-                SearchSourceBuilder()
-                        .query(
-                                QueryBuilders.matchAllQuery()
-                        )
-                        .sort(
-                                SortBuilders
-                                        .fieldSort("page")
-                                        .order(SortOrder.ASC)
-                        )
-                        .size(10000)
-        )
-                .map { searchSourceBuilder ->
-                    SearchRequest()
-                            .indices(this.elasticsearchProperties.pagesIndex)
-                            .source(searchSourceBuilder)
-                }
-                .flatMap { searchRequest ->
-                    ElasticsearchUtils.async<SearchResponse> { actionListener ->
-                        this.restHighLevelClient.searchAsync(searchRequest, RequestOptions.DEFAULT, actionListener)
-                    }
-                }
-                .flatMapIterable { searchResponse ->
-                    searchResponse.hits
-                }
-                .map { searchHit ->
-                    this.mapper.readValue<Page>(searchHit.sourceRef.streamInput())
-                }
-    }
-
-    private fun clearPages(): Mono<Void> {
-        return Mono.just(
-                DeleteByQueryRequest(this.elasticsearchProperties.pagesIndex)
-                        .setQuery(
-                                QueryBuilders.matchAllQuery()
-                        )
-                        .setRefresh(true)
-        )
-                .flatMap { deleteByQueryRequest ->
-                    ElasticsearchUtils.async<BulkByScrollResponse> { actionListener ->
-                        this.restHighLevelClient.deleteByQueryAsync(deleteByQueryRequest, RequestOptions.DEFAULT, actionListener)
                     }
                 }
                 .then()
