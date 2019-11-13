@@ -3,7 +3,10 @@
     "query": {
       "enabled": false
     },
-    "lastUse": {
+    "lastUseDate": {
+      "type": "date"
+    },
+    "lastComputationDate": {
       "type": "date"
     }
   }

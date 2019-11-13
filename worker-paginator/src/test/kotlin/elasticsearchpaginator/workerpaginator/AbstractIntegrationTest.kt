@@ -7,11 +7,18 @@ import elasticsearchpaginator.workerpaginator.configuration.ElasticsearchPropert
 import elasticsearchpaginator.workerpaginator.model.QueryEntry
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.admin.indices.refresh.RefreshResponse
+import org.elasticsearch.action.bulk.BulkRequest
+import org.elasticsearch.action.bulk.BulkResponse
+import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.action.search.SearchRequest
 import org.elasticsearch.action.search.SearchResponse
+import org.elasticsearch.action.support.WriteRequest
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestHighLevelClient
+import org.elasticsearch.common.xcontent.XContentType
 import org.elasticsearch.index.query.QueryBuilders
+import org.elasticsearch.index.reindex.BulkByScrollResponse
+import org.elasticsearch.index.reindex.DeleteByQueryRequest
 import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
@@ -110,6 +117,44 @@ abstract class AbstractIntegrationTest {
                 .map { searchHit ->
                     this.mapper.readValue<QueryEntry>(searchHit.sourceRef.streamInput())
                 }
+    }
+
+    protected fun saveQueryEntries(queryEntries: List<QueryEntry>): Mono<Void> {
+        return Flux.fromIterable(queryEntries)
+                .map { queryEntry ->
+                    IndexRequest()
+                            .index(this.elasticsearchProperties.queryEntriesIndex)
+                            .id(queryEntry.query.hash())
+                            .source(this.mapper.writeValueAsBytes(queryEntry), XContentType.JSON)
+                }
+                .collectList()
+                .map { indexRequests ->
+                    BulkRequest()
+                            .add(indexRequests)
+                            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                }
+                .flatMap { bulkRequest ->
+                    ElasticsearchUtils.async<BulkResponse> { actionListener ->
+                        this.restHighLevelClient.bulkAsync(bulkRequest, RequestOptions.DEFAULT, actionListener)
+                    }
+                }
+                .then()
+    }
+
+    protected fun clearQueryEntries(): Mono<Void> {
+        return Mono.just(
+                DeleteByQueryRequest(this.elasticsearchProperties.queryEntriesIndex)
+                        .setQuery(
+                                QueryBuilders.matchAllQuery()
+                        )
+                        .setRefresh(true)
+        )
+                .flatMap { deleteByQueryRequest ->
+                    ElasticsearchUtils.async<BulkByScrollResponse> { actionListener ->
+                        this.restHighLevelClient.deleteByQueryAsync(deleteByQueryRequest, RequestOptions.DEFAULT, actionListener)
+                    }
+                }
+                .then()
     }
 
 }
