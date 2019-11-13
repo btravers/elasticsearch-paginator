@@ -71,7 +71,7 @@ class QueryEntryRepository(private val restHighLevelClient: RestHighLevelClient,
                 }
     }
 
-    fun updateLastUseDate(queryEntry: QueryEntry): Mono<QueryEntry> {
+    fun updateLastUseDate(queryEntry: QueryEntry): Mono<Void> {
         return Mono.just(
                 UpdateRequest()
                         .index(this.elasticsearchProperties.queryEntriesIndex)
@@ -84,27 +84,22 @@ class QueryEntryRepository(private val restHighLevelClient: RestHighLevelClient,
                         this.restHighLevelClient.updateAsync(updateRequest, RequestOptions.DEFAULT, actionListener)
                     }
                 }
-                .map { updateResponse ->
-                    this.mapper.readValue<QueryEntry>(updateResponse.getResult.source())
-                }
+                .then()
     }
 
-    fun updateLastComputationDate(queryEntry: QueryEntry): Mono<QueryEntry> {
+    fun updateLastComputationDate(queryEntry: QueryEntry): Mono<Void> {
         return Mono.just(
                 UpdateRequest()
                         .index(this.elasticsearchProperties.queryEntriesIndex)
                         .id(queryEntry.query.hash())
                         .doc(this.mapper.writeValueAsBytes(QueryEntryLastComputationDateUpdate(lastComputationDate = queryEntry.lastComputationDate)), XContentType.JSON)
-                        .upsert(this.mapper.writeValueAsBytes(queryEntry), XContentType.JSON)
         )
                 .flatMap { updateRequest ->
                     async<UpdateResponse> { actionListener ->
                         this.restHighLevelClient.updateAsync(updateRequest, RequestOptions.DEFAULT, actionListener)
                     }
                 }
-                .map { updateResponse ->
-                    this.mapper.readValue<QueryEntry>(updateResponse.getResult.source())
-                }
+                .then()
     }
 
     fun findOne(id: String): Mono<QueryEntry> {
@@ -117,6 +112,9 @@ class QueryEntryRepository(private val restHighLevelClient: RestHighLevelClient,
                     async<GetResponse> { actionListener ->
                         this.restHighLevelClient.getAsync(getRequest, RequestOptions.DEFAULT, actionListener)
                     }
+                }
+                .filter { getResponse ->
+                    getResponse.isExists
                 }
                 .map { getResponse ->
                     this.mapper.readValue<QueryEntry>(getResponse.sourceAsBytes)

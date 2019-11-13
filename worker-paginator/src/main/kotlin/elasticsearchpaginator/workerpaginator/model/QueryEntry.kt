@@ -6,5 +6,5 @@ import java.time.Instant
 data class QueryEntry(
         val query: Query,
         val lastUseDate: Instant,
-        val lastComputationDate: Instant = Instant.EPOCH
+        val lastComputationDate: Instant
 )

@@ -3,7 +3,10 @@ package elasticsearchpaginator.workerpaginator
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import elasticsearchpaginator.core.util.ElasticsearchUtils
+import elasticsearchpaginator.core.util.RabbitmqUtils.createExchange
+import elasticsearchpaginator.core.util.RabbitmqUtils.createQueues
 import elasticsearchpaginator.workerpaginator.configuration.ElasticsearchProperties
+import elasticsearchpaginator.workerpaginator.configuration.RabbitmqProperties
 import elasticsearchpaginator.workerpaginator.model.QueryEntry
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.admin.indices.refresh.RefreshResponse
@@ -21,6 +24,7 @@ import org.elasticsearch.index.reindex.BulkByScrollResponse
 import org.elasticsearch.index.reindex.DeleteByQueryRequest
 import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.junit.jupiter.api.extension.ExtendWith
+import org.springframework.amqp.core.AmqpAdmin
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient
 import org.springframework.boot.test.context.SpringBootTest
@@ -33,6 +37,7 @@ import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.elasticsearch.ElasticsearchContainer
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.rabbitmq.Receiver
 import reactor.test.StepVerifier
 import java.time.Duration
 
@@ -51,6 +56,15 @@ abstract class AbstractIntegrationTest {
 
     @Autowired
     protected lateinit var mapper: ObjectMapper
+
+    @Autowired
+    protected lateinit var receiver: Receiver
+
+    @Autowired
+    protected lateinit var amqpAdmin: AmqpAdmin
+
+    @Autowired
+    protected lateinit var rabbitmqProperties: RabbitmqProperties
 
     @Autowired
     protected lateinit var elasticsearchProperties: ElasticsearchProperties
@@ -155,6 +169,19 @@ abstract class AbstractIntegrationTest {
                     }
                 }
                 .then()
+    }
+
+    protected fun <T> consumeRabbitmqMessages(key: String, clazz: Class<T>): Flux<T> {
+        val queueName = "${this.rabbitmqProperties.exchangeName}.$key"
+        val deadLetterQueueName = "${this.rabbitmqProperties.exchangeName}.$key.dead-letter"
+
+        val exchange = this.amqpAdmin.createExchange(this.rabbitmqProperties.exchangeName)
+        this.amqpAdmin.createQueues(queueName, deadLetterQueueName, key, exchange)
+
+        return this.receiver.consumeAutoAck(queueName)
+                .map { delivery -> this.mapper.readValue(delivery.body, clazz) }
+                .take(1)
+                .timeout(Duration.ofSeconds(1))
     }
 
 }

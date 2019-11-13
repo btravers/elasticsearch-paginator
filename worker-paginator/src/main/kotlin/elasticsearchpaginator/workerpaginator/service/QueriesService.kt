@@ -17,19 +17,26 @@ class QueriesService(private val queryEntryRepository: QueryEntryRepository,
 
     fun upsertQueryAndAskForPagesComputation(query: Query): Mono<Void> {
         return this.queryEntryRepository.findOne(query.hash())
+                .map { queryEntry ->
+                    queryEntry.copy(lastUseDate = Instant.now())
+                }
                 .defaultIfEmpty(
                         QueryEntry(
                                 query = query,
-                                lastUseDate = Instant.now()
+                                lastUseDate = Instant.now(),
+                                lastComputationDate = Instant.EPOCH
                         )
                 )
-                .flatMap(this.queryEntryRepository::updateLastUseDate)
+                .flatMap { queryEntry ->
+                    this.queryEntryRepository.updateLastUseDate(queryEntry)
+                            .then(Mono.just(queryEntry))
+                }
                 .filter { queryEntry ->
                     Instant.now().minus(minIntervalBetweenPagesRefresh) > queryEntry.lastComputationDate
                 }
                 .flatMapMany { queryEntry ->
                     this.computePagesSender.sendComputePagesEvent(query)
-                            .flatMap { this.queryEntryRepository.updateLastComputationDate(queryEntry.copy(lastComputationDate = Instant.now())) }
+                            .then(this.queryEntryRepository.updateLastComputationDate(queryEntry.copy(lastComputationDate = Instant.now())))
                 }
                 .then()
     }
