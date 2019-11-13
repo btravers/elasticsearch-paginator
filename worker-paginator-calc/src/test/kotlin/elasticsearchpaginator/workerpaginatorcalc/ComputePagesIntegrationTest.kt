@@ -1,7 +1,6 @@
 package elasticsearchpaginator.workerpaginatorcalc
 
 import elasticsearchpaginator.core.model.Query
-import elasticsearchpaginator.core.model.SortBuilderList
 import elasticsearchpaginator.core.util.ElasticsearchUtils
 import elasticsearchpaginator.workerpaginatorcalc.model.Page
 import elasticsearchpaginator.workerpaginatorcalc.service.ComputePagesService
@@ -62,14 +61,14 @@ class ComputePagesIntegrationTest : AbstractIntegrationTest() {
                 index = indexName,
                 size = 4,
                 firstPageSize = 2,
-                query = QueryBuilders.matchAllQuery(),
-                sort = SortBuilderList(
-                        listOf(
-                                SortBuilders
-                                        .fieldSort("id.keyword")
-                                        .order(SortOrder.ASC)
-                        )
+                query = QueryBuilders.matchAllQuery().toString(),
+                sort = listOf(
+                        SortBuilders
+                                .fieldSort("id.keyword")
+                                .order(SortOrder.ASC)
+                                .toString()
                 )
+                        .joinToString(",", "[", "]")
         )
         val sortedArticles = articles
                 .sortedBy { article -> article.id }
@@ -147,14 +146,14 @@ class ComputePagesIntegrationTest : AbstractIntegrationTest() {
                 index = indexName,
                 size = 4,
                 firstPageSize = 2,
-                query = QueryBuilders.matchAllQuery(),
-                sort = SortBuilderList(
-                        listOf(
-                                SortBuilders
-                                        .fieldSort("content.title.keyword")
-                                        .order(SortOrder.ASC)
-                        )
+                query = QueryBuilders.matchAllQuery().toString(),
+                sort = listOf(
+                        SortBuilders
+                                .fieldSort("content.title.keyword")
+                                .order(SortOrder.ASC)
+                                .toString()
                 )
+                        .joinToString(",", "[", "]")
         )
         val sortedArticles = articles
                 .sortedBy { article -> article.content.title }

@@ -27,3 +27,4 @@ app:
     delete-pages-key: delete-pages
     compute-pages-key: compute-pages
   min-interval-between-pages-refresh: 60m
+  query-entries-ttl: 3d

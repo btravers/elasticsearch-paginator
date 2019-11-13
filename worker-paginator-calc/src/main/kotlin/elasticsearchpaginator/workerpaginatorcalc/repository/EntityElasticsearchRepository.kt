@@ -1,45 +1,66 @@
 package elasticsearchpaginator.workerpaginatorcalc.repository
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import elasticsearchpaginator.core.util.ElasticsearchUtils.async
 import elasticsearchpaginator.workerpaginatorcalc.configuration.ElasticsearchProperties
+import elasticsearchpaginator.workerpaginatorcalc.exception.UnexpectedQueryException
 import org.elasticsearch.action.search.*
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestHighLevelClient
+import org.elasticsearch.common.settings.Settings
 import org.elasticsearch.common.unit.TimeValue
-import org.elasticsearch.index.query.QueryBuilder
+import org.elasticsearch.common.xcontent.DeprecationHandler
+import org.elasticsearch.common.xcontent.NamedXContentRegistry
+import org.elasticsearch.common.xcontent.XContentFactory
+import org.elasticsearch.common.xcontent.XContentType
+import org.elasticsearch.search.SearchModule
 import org.elasticsearch.search.builder.SearchSourceBuilder
-import org.elasticsearch.search.sort.FieldSortBuilder
-import org.elasticsearch.search.sort.SortBuilder
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Mono
+import java.util.*
+
 
 @Repository
-class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelClient,
+class EntityElasticsearchRepository(private val restHighLevelClient: RestHighLevelClient,
+                                    private val mapper: ObjectMapper,
                                     private val elasticsearchProperties: ElasticsearchProperties) {
 
     private val scrollKeepAlive = TimeValue.timeValueMillis(this.elasticsearchProperties.scrollKeepAliveDuration.toMillis())
 
-    fun searchScroll(index: String, query: QueryBuilder, sort: List<SortBuilder<*>>, size: Int): Mono<SearchResponse> {
-
-        val includes = sort
-                .filterIsInstance<FieldSortBuilder>()
-                .map { fieldSortBuilder ->
-                    fieldSortBuilder.fieldName
+    fun searchScroll(index: String, query: String, sort: String, size: Int): Mono<SearchResponse> {
+        val includes = this.mapper.readValue<List<Any>>(sort)
+                .map { s ->
+                    when (s) {
+                        is String -> s
+                        is Map<*, *> -> s.keys.first() as String
+                        else -> throw UnexpectedQueryException("Could not read sort value '$s'")
+                    }
                 }
-                .map { fieldName ->
-                    fieldName.removeSuffix(".keyword")
-                }
-                .toTypedArray()
+                .map { fieldName -> fieldName.removeSuffix(".keyword") }
+                .map { fieldName -> """"$fieldName"""" }
+                .joinToString(",", "[", "]")
 
-        return Mono.just(
-                SearchSourceBuilder()
-                        .fetchSource(includes, null)
-                        .query(query)
-                        .let { searchSourceBuilder ->
-                            sort.fold(searchSourceBuilder) { acc, s -> acc.sort(s) }
-                        }
-                        .size(size)
-        )
+        val payload = """
+            {
+                "_source": $includes,
+                "query": $query,
+                "sort": $sort
+            }
+        """.trimIndent()
+
+        return Mono.fromCallable {
+            val searchSourceBuilder = SearchSourceBuilder()
+            val searchModule = SearchModule(Settings.EMPTY, false, Collections.emptyList())
+            val parser = XContentFactory.xContent(XContentType.JSON)
+                    .createParser(
+                            NamedXContentRegistry(searchModule.namedXContents),
+                            DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
+                            payload
+                    )
+            searchSourceBuilder.parseXContent(parser)
+            searchSourceBuilder
+        }
                 .map { searchSourceBuilder ->
                     SearchRequest()
                             .indices(index)
@@ -48,7 +69,7 @@ class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelCl
                 }
                 .flatMap { searchRequest ->
                     async<SearchResponse> { actionListener ->
-                        this.highLevelClient.searchAsync(searchRequest, RequestOptions.DEFAULT, actionListener)
+                        this.restHighLevelClient.searchAsync(searchRequest, RequestOptions.DEFAULT, actionListener)
                     }
                 }
     }
@@ -60,7 +81,7 @@ class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelCl
         )
                 .flatMap { searchScrollRequest ->
                     async<SearchResponse> { actionListener ->
-                        this.highLevelClient.scrollAsync(searchScrollRequest, RequestOptions.DEFAULT, actionListener)
+                        this.restHighLevelClient.scrollAsync(searchScrollRequest, RequestOptions.DEFAULT, actionListener)
                     }
                 }
     }
@@ -72,7 +93,7 @@ class EntityElasticsearchRepository(private val highLevelClient: RestHighLevelCl
         )
                 .flatMap { clearScrollRequest ->
                     async<ClearScrollResponse> { actionListener ->
-                        this.highLevelClient.clearScrollAsync(clearScrollRequest, RequestOptions.DEFAULT, actionListener)
+                        this.restHighLevelClient.clearScrollAsync(clearScrollRequest, RequestOptions.DEFAULT, actionListener)
                     }
                 }
     }

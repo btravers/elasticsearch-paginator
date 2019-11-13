@@ -36,7 +36,7 @@ import java.time.Instant
 class QueryEntryRepository(private val restHighLevelClient: RestHighLevelClient,
                            private val mapper: ObjectMapper,
                            private val elasticsearchProperties: ElasticsearchProperties,
-                           @Value("classpath:elasticsearch/query-entries-mappings.json") private val queryEntriesMappings: Resource) {
+                           @Value("classpath:query-entries-mappings.json") private val queryEntriesMappings: Resource) {
 
     private val elasticsearchMaxResultWindow = 10000
 
