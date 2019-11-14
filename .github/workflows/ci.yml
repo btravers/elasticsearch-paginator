@@ -1,4 +1,4 @@
-name: Docker images publish
+name: ci
 
 on:
   push:
